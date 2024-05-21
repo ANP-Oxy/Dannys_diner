@@ -335,3 +335,154 @@ ON table_1.customer_id = table_2.customer_id
 LEFT JOIN menu
 ON table_1.product_id = menu.product_id;
 ```
+### 7. Which item was purchased just before the customer became a member?
+- Here I was opted to select orders that were done before the day of becoming a member
+- customer could have ordered on the same day as they become the member but it's hard to say if they ordered before or after they became member on the day since we have no timestamps. 
+
+```sql
+WITH table_1 AS 
+(
+    SELECT sales.customer_id, sales.product_id, sales.order_date, sales.order_date - members.join_date  as differential, members.join_date
+    FROM sales
+    LEFT JOIN members
+    ON sales.customer_id = members.customer_id
+),   
+
+table_2 AS 
+(   
+    SELECT customer_id, MAX(differential) AS differential
+    FROM table_1
+    WHERE differential < 0
+    GROUP BY customer_id
+)
+
+SELECT table_1.customer_id, menu.product_name, table_1.order_date, table_1.join_date
+FROM table_2
+LEFT JOIN table_1
+ON table_1.customer_id = table_2.customer_id
+    AND table_1.differential = table_2.differential
+LEFT JOIN menu
+ON table_1.product_id = menu.product_id;
+```
+
+```{python}
+%%sql
+WITH table_1 AS 
+(
+    SELECT sales.customer_id, sales.product_id, sales.order_date, sales.order_date - members.join_date  as differential, members.join_date
+    FROM sales
+    LEFT JOIN members
+    ON sales.customer_id = members.customer_id
+),   
+
+table_2 AS 
+(   
+    SELECT customer_id, MAX(differential) AS differential
+    FROM table_1
+    WHERE differential < 0
+    GROUP BY customer_id
+)
+
+SELECT table_1.customer_id, menu.product_name, table_1.order_date, table_1.join_date
+FROM table_2
+LEFT JOIN table_1
+ON table_1.customer_id = table_2.customer_id
+    AND table_1.differential = table_2.differential
+LEFT JOIN menu
+ON table_1.product_id = menu.product_id;
+
+```
+### 8. What is the total items and amount spent for each member before they became a member?
+- Again here I will be excluding the day of becoming member for the sake of no ambiquity 
+```sql
+WITH table_1 AS 
+(
+    SELECT sales.customer_id, sales.product_id, sales.order_date, sales.order_date - members.join_date  as differential, members.join_date
+    FROM sales
+    LEFT JOIN members
+    ON sales.customer_id = members.customer_id
+),   
+
+table_2 AS 
+(   
+    SELECT customer_id, differential 
+    FROM table_1
+    WHERE differential < 0
+)
+
+SELECT table_1.customer_id, 
+        COUNT(table_1.customer_id) AS no_orders_before_member, 
+        SUM(menu.price) AS spent_before_member
+FROM table_2
+LEFT JOIN table_1
+ON table_1.customer_id = table_2.customer_id
+    AND table_1.differential = table_2.differential
+LEFT JOIN menu
+ON table_1.product_id = menu.product_id
+GROUP BY table_1.customer_id
+```
+```{python}
+%%sql
+WITH table_1 AS 
+(
+    SELECT sales.customer_id, sales.product_id, sales.order_date, sales.order_date - members.join_date  as differential, members.join_date
+    FROM sales
+    LEFT JOIN members
+    ON sales.customer_id = members.customer_id
+),   
+
+table_2 AS 
+(   
+    SELECT customer_id, differential 
+    FROM table_1
+    WHERE differential < 0
+)
+
+SELECT table_1.customer_id, 
+        COUNT(table_1.customer_id) AS no_orders_before_member, 
+        SUM(menu.price) AS spent_before_member
+FROM table_2
+LEFT JOIN table_1
+ON table_1.customer_id = table_2.customer_id
+    AND table_1.differential = table_2.differential
+LEFT JOIN menu
+ON table_1.product_id = menu.product_id
+GROUP BY table_1.customer_id
+```
+### 9. If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+```sql
+SELECT customer_id, SUM(points) as points
+FROM (
+                
+        SELECT customer_id, product_name, price, order_date,
+               CASE WHEN product_name = 'sushi' THEN price * 10 * 2
+                    ELSE price * 10
+                END AS points
+        FROM sales
+        LEFT JOIN menu
+        ON sales.product_id = menu.product_id
+        ORDER BY customer_id
+    )
+
+GROUP BY customer_id
+ORDER BY points DESC;
+
+```
+```{python}
+%%sql
+SELECT customer_id, SUM(points) as points
+FROM (
+                
+        SELECT customer_id, product_name, price, order_date,
+               CASE WHEN product_name = 'sushi' THEN price * 10 * 2
+                    ELSE price * 10
+                END AS points
+        FROM sales
+        LEFT JOIN menu
+        ON sales.product_id = menu.product_id
+        ORDER BY customer_id
+    )
+
+GROUP BY customer_id
+ORDER BY points DESC;
+```
