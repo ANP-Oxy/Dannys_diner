@@ -1,0 +1,337 @@
+---
+title: "Case Study #1 - Danny's Diner"
+format: 
+    html:
+        highlight-style: dracula
+        theme: flatly
+        code-fold: true
+        code-tools: true
+        page-layout: full
+execute: 
+  echo: false
+jupyter: python3
+---
+
+The entire case study is taken from [7 week sql challenge by Danny ma](https://8weeksqlchallenge.com/)
+I will be using the database schema and the questions from those case studies and solve the case study in this jupyter notebook
+
+
+## Introduction
+Danny seriously loves Japanese food so in the beginning of 2021, he decides to embark upon a risky venture and opens up a cute little restaurant that sells his 3 favourite foods: sushi, curry and ramen.
+
+Danny’s Diner is in need of your assistance to help the restaurant stay afloat - the restaurant has captured some very basic data from their few months of operation but have no idea how to use their data to help them run the business.
+
+## Problem Statement
+Danny wants to use the data to answer a few simple questions about his customers, especially about their visiting patterns, how much money they’ve spent and also which menu items are their favourite. Having this deeper connection with his customers will help him deliver a better and more personalised experience for his loyal customers.
+
+He plans on using these insights to help him decide whether he should expand the existing customer loyalty program - additionally he needs help to generate some basic datasets so his team can easily inspect the data without needing to use SQL.
+
+Danny has provided you with a sample of his overall customer data due to privacy issues - but he hopes that these examples are enough for you to write fully functioning SQL queries to help him answer his questions!
+
+Danny has shared with you 3 key datasets for this case study:
+
+- sales
+- menu
+- members - 123
+
+The database schema looks like following 
+
+![dannys_diner database schema](schema.png)
+
+
+## Case Study Questions
+Each of the following case study questions can be answered using a single SQL statement:
+
+1. What is the total amount each customer spent at the restaurant?
+2. How many days has each customer visited the restaurant?
+3. What was the first item from the menu purchased by each customer?
+4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+5. Which item was the most popular for each customer?
+6. Which item was purchased first by the customer after they became a member?
+7. Which item was purchased just before the customer became a member?
+8. What is the total items and amount spent for each member before they became a member?
+9. If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+
+
+# Connecting to the database
+
+- I have already created the database schema on my local postgresql server.
+- To connect to the database from jupyter notebooks I will use [Ipython-sql extension](https://github.com/catherinedevlin/ipython-sql) from jupyter notebook
+
+```{python}
+import dbinfo
+%load_ext sql
+connection = "postgresql://{user}:{password}@localhost:5432/dannys_diner".format(user=dbinfo.user, password=dbinfo.password)
+%config SqlMagic.displaycon = False
+%config SqlMagic.feedback= False
+```
+```{python}
+%%sql
+$connection
+```
+```{python}
+%%sql
+SET search_path TO dannys_diner, public;
+```
+
+### Question 1: What is the total amount each customer spent at the restaurant?
+``` sql
+SELECT 
+    sales.customer_id, 
+    SUM(menu.price) 
+FROM 
+    sales
+LEFT JOIN 
+    menu
+ON sales.product_id = menu.product_id
+GROUP BY sales.customer_id;
+```
+
+```{python}
+%%sql 
+
+SELECT 
+    sales.customer_id, 
+    SUM(menu.price) 
+FROM 
+    sales
+LEFT JOIN 
+    menu
+ON sales.product_id = menu.product_id
+GROUP BY sales.customer_id;
+```
+
+### 2. How many days has each customer visited the restaurant?
+
+```sql
+%%sql
+
+SELECT customer_id, COUNT(order_date) AS number_of_days_visited
+FROM  (SELECT 
+        DISTINCT customer_id, order_date
+       FROM 
+        sales)
+GROUP BY
+    customer_id
+ORDER BY
+    customer_id;
+```
+
+```{python}
+%%sql
+
+SELECT customer_id, COUNT(order_date) AS number_of_days_visited
+FROM  (SELECT 
+        DISTINCT customer_id, order_date
+       FROM 
+        sales)
+GROUP BY
+    customer_id
+ORDER BY
+    customer_id;
+```
+
+
+
+### 3. What was the first item from the menu purchased by each customer?
+
+```sql
+WITH first_orders AS (
+    SELECT customer_id, MIN(order_date) as order_date
+    FROM sales
+    GROUP BY customer_id
+)
+
+SELECT 
+    first_orders.order_date, first_orders.customer_id, product_name
+FROM first_orders
+LEFT JOIN sales
+ON first_orders.customer_id = sales.customer_id
+    AND first_orders.order_date = sales.order_date
+LEFT JOIN menu
+ON sales.product_id = menu.product_id;
+```
+
+```{python}
+%%sql
+
+WITH first_orders AS (
+    SELECT customer_id, MIN(order_date) as order_date
+    FROM sales
+    GROUP BY customer_id
+)
+
+SELECT first_orders.order_date, first_orders.customer_id, product_name
+FROM first_orders
+LEFT JOIN sales
+ON first_orders.customer_id = sales.customer_id
+    AND first_orders.order_date = sales.order_date
+LEFT JOIN menu
+ON sales.product_id = menu.product_id
+ORDER BY customer_id, order_date;
+```
+
+### 4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+```sql
+
+WITH most_ordered_dish AS (
+	SELECT product_name, COUNT(product_name) AS times_ordered
+	FROM dannys_diner.sales
+	LEFT JOIN dannys_diner.menu
+	ON dannys_diner.sales.product_id = dannys_diner.menu.product_id
+	GROUP BY product_name
+	ORDER BY times_ordered DESC
+	LIMIT 1)
+
+
+
+SELECT customer_id, COUNT(product_name) AS times_ordered_most_ordered
+FROM dannys_diner.sales
+LEFT JOIN dannys_diner.menu
+ON dannys_diner.sales.product_id = dannys_diner.menu.product_id
+WHERE product_name = (SELECT product_name FROM most_ordered_dish)
+GROUP BY customer_id
+ORDER BY times_ordered_most_ordered DESC;
+
+```
+```{python}
+%%sql
+
+
+WITH most_ordered_dish AS (
+	SELECT product_name, COUNT(product_name) AS times_ordered
+	FROM dannys_diner.sales
+	LEFT JOIN dannys_diner.menu
+	ON dannys_diner.sales.product_id = dannys_diner.menu.product_id
+	GROUP BY product_name
+	ORDER BY times_ordered DESC
+	LIMIT 1)
+
+
+
+SELECT customer_id, COUNT(product_name) AS times_ordered_most_ordered
+FROM dannys_diner.sales
+LEFT JOIN dannys_diner.menu
+ON dannys_diner.sales.product_id = dannys_diner.menu.product_id
+WHERE product_name = (SELECT product_name FROM most_ordered_dish)
+GROUP BY customer_id
+ORDER BY times_ordered_most_ordered DESC;
+```
+
+
+### 5. Which item was the most popular for each customer?
+
+
+```sql
+WITH per_dish AS
+(
+		SELECT customer_id, sales.product_id, COUNT(product_name) AS times_ordered
+		FROM sales
+		LEFT JOIN menu
+		ON sales.product_id = menu.product_id
+		GROUP BY customer_id, sales.product_id
+		ORDER BY customer_id, times_ordered DESC
+),
+most_popular AS 
+(
+		SELECT customer_id, MAX(times_ordered) AS times_ordered
+		FROM per_dish
+		GROUP BY customer_id
+)
+		
+
+SELECT most_popular.customer_id, most_popular.times_ordered, product_name
+FROM most_popular 
+LEFT JOIN per_dish
+ON most_popular.customer_id = per_dish.customer_id
+	AND most_popular.times_ordered = per_dish.times_ordered
+LEFT JOIN menu
+ON per_dish.product_id = menu.product_id
+ORDER BY customer_id;
+```
+Most popuplar dishes for each customer can be seen below. As we can see for one of the customers multiple dishes where tied for most popular dish. 
+```{python}
+%%sql
+
+WITH per_dish AS
+(
+		SELECT customer_id, sales.product_id, COUNT(product_name) AS times_ordered
+		FROM sales
+		LEFT JOIN menu
+		ON sales.product_id = menu.product_id
+		GROUP BY customer_id, sales.product_id
+		ORDER BY customer_id, times_ordered DESC
+),
+most_popular AS 
+(
+		SELECT customer_id, MAX(times_ordered) AS times_ordered
+		FROM per_dish
+		GROUP BY customer_id
+)
+		
+
+SELECT most_popular.customer_id, most_popular.times_ordered, product_name
+FROM most_popular 
+LEFT JOIN per_dish
+ON most_popular.customer_id = per_dish.customer_id
+	AND most_popular.times_ordered = per_dish.times_ordered
+LEFT JOIN menu
+ON per_dish.product_id = menu.product_id
+ORDER BY customer_id;
+```
+
+### 6. Which item was purchased first by the customer after they became a member?
+```sql
+WITH table_1 AS 
+(
+    SELECT sales.customer_id, sales.product_id, sales.order_date, 
+           sales.order_date - members.join_date  as differential, members.join_date
+    FROM sales
+    LEFT JOIN members
+    ON sales.customer_id = members.customer_id
+),   
+
+table_2 AS 
+(   
+    SELECT customer_id, MIN(differential) AS differential
+    FROM table_1
+    WHERE differential >= 0
+    GROUP BY customer_id
+)
+
+SELECT table_1.customer_id, menu.product_name, 
+       table_1.order_date, table_1.join_date
+FROM table_2
+LEFT JOIN table_1
+ON table_1.customer_id = table_2.customer_id
+    AND table_1.differential = table_2.differential
+LEFT JOIN menu
+ON table_1.product_id = menu.product_id;
+```
+```{python}
+%%sql
+WITH table_1 AS 
+(
+    SELECT sales.customer_id, sales.product_id, sales.order_date, sales.order_date - members.join_date  as differential, members.join_date
+    FROM sales
+    LEFT JOIN members
+    ON sales.customer_id = members.customer_id
+),   
+
+table_2 AS 
+(   
+    SELECT customer_id, MIN(differential) AS differential
+    FROM table_1
+    WHERE differential >= 0
+    GROUP BY customer_id
+)
+
+SELECT table_1.customer_id, menu.product_name, table_1.order_date, table_1.join_date
+FROM table_2
+LEFT JOIN table_1
+ON table_1.customer_id = table_2.customer_id
+    AND table_1.differential = table_2.differential
+LEFT JOIN menu
+ON table_1.product_id = menu.product_id;
+```
