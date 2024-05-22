@@ -4,15 +4,13 @@ format:
     html:
         highlight-style: dracula
         theme: flatly
-        code-fold: true
-        code-tools: true
         page-layout: full
 execute: 
-  echo: false
+    echo: false 
 jupyter: python3
 ---
 
-The entire case study is taken from [7 week sql challenge by Danny ma](https://8weeksqlchallenge.com/)
+The entire case study is taken from [8 week sql challenge by Danny ma](https://8weeksqlchallenge.com/)
 I will be using the database schema and the questions from those case studies and solve the case study in this jupyter notebook
 
 
@@ -60,6 +58,8 @@ Each of the following case study questions can be answered using a single SQL st
 - To connect to the database from jupyter notebooks I will use [Ipython-sql extension](https://github.com/catherinedevlin/ipython-sql) from jupyter notebook
 
 ```{python}
+#| output: false
+#| echo: true
 import dbinfo
 %load_ext sql
 connection = "postgresql://{user}:{password}@localhost:5432/dannys_diner".format(user=dbinfo.user, password=dbinfo.password)
@@ -67,6 +67,8 @@ connection = "postgresql://{user}:{password}@localhost:5432/dannys_diner".format
 %config SqlMagic.feedback= False
 ```
 ```{python}
+#| output: false
+#| echo: true
 %%sql
 $connection
 ```
@@ -105,8 +107,6 @@ GROUP BY sales.customer_id;
 ### 2. How many days has each customer visited the restaurant?
 
 ```sql
-%%sql
-
 SELECT customer_id, COUNT(order_date) AS number_of_days_visited
 FROM  (SELECT 
         DISTINCT customer_id, order_date
@@ -485,4 +485,57 @@ FROM (
 
 GROUP BY customer_id
 ORDER BY points DESC;
+```
+### 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+
+```sql
+WITH table_1 AS 
+(
+        SELECT  sales.customer_id, order_date, join_date,
+                sales.product_id, product_name, price,
+                order_date - join_date AS days_since_member
+        FROM sales
+        LEFT JOIN menu
+        ON sales.product_id = menu.product_id
+        LEFT JOIN members
+        ON sales.customer_id = members.customer_id
+        ORDER BY customer_id
+)
+
+SELECT customer_id,
+       SUM(CASE WHEN days_since_member >= 0 AND days_since_member <= 6 
+                THEN price * 2 * 10
+                WHEN product_name = 'sushi' 
+                THEN price * 2 * 10
+                ELSE price * 10
+           END ) AS points
+FROM table_1
+WHERE order_date <= TO_DATE('20210131', 'YYYYMMDD')
+GROUP BY customer_id;
+```
+```{python}
+%%sql
+WITH table_1 AS 
+(
+        SELECT  sales.customer_id, order_date, join_date,
+                sales.product_id, product_name, price,
+                order_date - join_date AS days_since_member
+        FROM sales
+        LEFT JOIN menu
+        ON sales.product_id = menu.product_id
+        LEFT JOIN members
+        ON sales.customer_id = members.customer_id
+        ORDER BY customer_id
+)
+
+SELECT customer_id,
+       SUM(CASE WHEN days_since_member >= 0 AND days_since_member <= 6 
+                THEN price * 2 * 10
+                WHEN product_name = 'sushi' 
+                THEN price * 2 * 10
+                ELSE price * 10
+           END ) AS points
+FROM table_1
+WHERE order_date <= TO_DATE('20210131', 'YYYYMMDD')
+GROUP BY customer_id;
 ```

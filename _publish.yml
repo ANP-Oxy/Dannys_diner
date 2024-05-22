@@ -1,0 +1,4 @@
+- source: Dannys_diner.qmd
+  quarto-pub:
+    - id: 4fbc0da5-549c-479d-8665-a9dfe537d5ed
+      url: 'https://anurag-patil.quarto.pub/case-study-1---dannys-diner'
