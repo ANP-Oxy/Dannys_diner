@@ -1,3 +1,4 @@
 # dannys_diner (restaurent data analysis with sql) 
 this repositery hosts resource files for the project 
-actual project is hosted at <<link will be posted soon>>
+
+[CHECK OUT THE CASE STUDY HERE]('https://anurag-patil.quarto.pub/case-study-1---dannys-diner')
